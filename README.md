@@ -7,7 +7,7 @@ The purpose of this script is to create Kicad footprints from gerber structures 
 Although it might work, the intention never was to import whole PCBs.
 
 ## Progress
-Until now only the import of gerber files with polygon regions is implemented. All other gerber primitives will not be converted.
+Until now only the import of gerber files with polygon regions is implemented. All other gerber primitives will not be converted. A more cleaned up version supporting mutiple gerber layers and more primitives is developed in the dev branch.
 
 ## How to use
 * Start the script. 
