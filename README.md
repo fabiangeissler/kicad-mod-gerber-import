@@ -10,7 +10,24 @@ Although it might work, the intention never was to import whole PCBs.
 Until now only the import of gerber files with polygon regions is implemented. All other gerber primitives will not be converted.
 
 ## How to use
-* Start the script. 
-* Open the gerber file.
-* Click on the edges you wish to assign pads to. A pad is quadratic in shape and as long as the edge. Polygons without a pad will be converted to unconnected copper polygons (e.g. for filter structures). The first pad is converted to a custom shape that contains the polygon. All further pads on the same polygon have the same pad number but are separate rectangular pads.
+
+### Workflow
+
+* Start the script PlotWindow.py. 
+* Open a gerber or 'flat' (no hierarchy) dxf file.
+* Assign connection pads
 * Save the kicad_mod file
+
+### Navigation
+
+Pan the grid using middle mouse button drag. Scroll for zoom.
+
+### Pad placement
+
+When hovering over an edge it will be highlighted. Pads can only pe placed on geometry edges. Click on the edges you wish to assign pads to and drag the mouse to place the pad to the left, right or center of the line. 
+
+The pad size can be set in the text boxes. The W dimension is parallel to the selected edge, H is perpendicular. If W=0 it will be the length of the edge. If H=0 it will be equal to W. The first pad is converted to a custom shape that contains the polygon. All further pads on the same polygon have the same pad number but are separate rectangular pads.
+
+Polygons without a pad will be converted to unconnected copper polygons (e.g. for filter structures). This may present problems with the DRC in KiCad 5 and earlier. It is better to place a pad and keep it unconnected.
+
+Pad placement can not be canceled. Created padc can not yet be removed.
