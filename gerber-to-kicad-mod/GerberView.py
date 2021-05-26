@@ -12,6 +12,9 @@ import KicadModTree as kmt
 from math import sqrt, atan2, pi
 import os
 
+from PlotWindow import PlotWindow
+import matplotlib.pyplot as plt
+
 from GerberLayer import GerberLayer
 
 class GerberView(tk.Frame):
@@ -37,6 +40,8 @@ class GerberView(tk.Frame):
         ''' Gerber Object '''
         self.gbr = None
         
+        self.pwnd = PlotWindow()
+        
     ''' Load button click. Select the file name '''
     def btnLoadClick(self):
         self.filename = filedialog.askopenfilename()
@@ -53,30 +58,28 @@ class GerberView(tk.Frame):
         
     ''' Load button click. Select the file name '''
     def dwgGerberClick(self, event):
-        clklines = []
+        # maximum distance 10px
+        maxdist = self.getGerberDist(10)
+        x, y = self.getGerberCoord(event.x, event.y)
         
-        for l in self.gbr.polyLines():
-            if l.distance(geo.Point(*self.getGerberCoord(event.x, event.y))) < self.getGerberDist(5):
-                clklines.append(l)
-                
-        if len(clklines) > 1:
-            print('Ambiguous selection!')
-        elif len(clklines) == 0:
-            print('No line hit!')
-        else:
-            print('Creating pad anchor...')
-            
-            line = clklines[0]
-            map = geo.mapping(line)
-            x1 = map['coordinates'][0][0]
-            y1 = map['coordinates'][0][1]
-            x2 = map['coordinates'][1][0]
-            y2 = map['coordinates'][1][1]
-                
-            poly = geo.Polygon([(x2,y2), (x1,y1), (x1+(y2-y1),y1-(x2-x1)), (x2+(y2-y1),y2-(x2-x1))])
-            self.gbr.addPad(poly)
-            self.drawGerber()
-            self.drawLine(line)
+        # get closest net
+        net, dist = self.gbr.closestNet(x, y)
+        
+        # exit if not close enough
+        if(dist > maxdist):
+            return
+        
+        # closest edge of net
+        edge, dist = net.closestEdge(x, y)
+        
+        # exit if edge not close enough
+        if(dist > maxdist):
+            return
+
+        padPoly = net.generateRectPad(edge)
+        net.addPad(padPoly)
+        
+        self.drawGerber()
         
     def readGerber(self):
         if(self.filename == None):
@@ -84,7 +87,10 @@ class GerberView(tk.Frame):
         
         self.gbr = GerberLayer(filename=self.filename)
         
-        self.drawGerber()
+        for poly in self.gbr._getMultiPolygon():
+            self.pwnd.plotPoly(poly)
+            
+        self.pwnd.setViewport(*self.gbr.boundingBox())
             
     def drawGerber(self):
         if(self.gbr == None):
@@ -107,8 +113,9 @@ class GerberView(tk.Frame):
         for poly in self.gbr._getMultiPolygon():
             self.drawRegion(poly)
             
-        #for p in self.gbr.getPads():
-        #    self.drawRegion(p)
+        for net in self.gbr.getNets():
+            for pad in net.getPads():
+                self.drawRegion(pad)
         
     def getViewCoord(self, x, y):
         sx = (x + self.translate_x) * self.scale_x + self.view_margin
@@ -152,5 +159,7 @@ if __name__ == '__main__':
     
     root.geometry("400x250+300+300")
     root.mainloop()
+    
+    plt.show(block = True)
 
 
