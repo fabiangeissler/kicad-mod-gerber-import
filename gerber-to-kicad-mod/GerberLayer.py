@@ -163,6 +163,37 @@ class GerberLayer(object):
         else:
             return (cnet, mindist)
     
+    def _boundToKmtPoly(self, bound, layer, offset_x, offset_y):  
+        # get coordinates in (x, y) form
+        m = geo.mapping(bound)
+        c = m['coordinates']
+        
+        # translate coordinates with offset
+        c_transl = []
+        
+        for x, y in c:
+            c_transl.append([x + offset_x, -y - offset_y])
+        
+        return kmt.Polygon(nodes=c_transl, layer=layer, width=0)
+        
+    def _polyToKmtPoly(self, poly, layer, offset_x, offset_y):
+        # orient polygon clock wise
+        poly = geo.polygon.orient(poly, 1)
+        
+        # get outer ring
+        outer = self._boundToKmtPoly(poly.exterior, layer, offset_x, offset_y);
+        
+        # reverse orientation (required by KMT)
+        poly = geo.polygon.orient(poly, -1)
+        
+        # cut internal voids
+        for intr in poly.interiors:
+            p = self._boundToKmtPoly(intr, layer, offset_x, offset_y);
+            outer.cut(p)
+            
+        return outer
+        
+    
     def appendKicadLayer(self, kicad_mod, mod_layer='F.Cu', offset_x = 0, offset_y = 0, startpad=1):
         '''
         Write the layer to a kicad_mod object from the KicadModTree.
@@ -172,14 +203,15 @@ class GerberLayer(object):
         # iterate closed polygons
         for net in self.nets:
             if len(net.getPads()) == 0:
-                # no pad = poly primitive        
-                map = geo.mapping(net.getPolygon())
-                coords = []
+                # no pad = poly primitive  
+                # get polygon object
+                poly = net.getPolygon();
                 
-                for x, y in map['coordinates'][0]:
-                    coords.append([x + offset_x, -y - offset_y])
+                # convert to KMT polygon
+                kmt_poly = self._polyToKmtPoly(poly, mod_layer, offset_x, offset_y)
                 
-                kicad_mod.append(kmt.Polygon(nodes=coords, layer=mod_layer, width=0))
+                # save
+                kicad_mod.append(kmt_poly)
                 
             else:
                 pads = net.getPads()
@@ -202,18 +234,12 @@ class GerberLayer(object):
                 # set pad rotation and transform polygon accordingly
                 rot_poly = aff.rotate(net.getPolygon(), -rot, (px, py))
                 
-                # poly primitive        
-                map = geo.mapping(rot_poly)
-                coords = []
-                
-                for x, y in map['coordinates'][0]:
-                    coords.append([x - px, -(y - py)])
-                
-                kipoly = kmt.Polygon(nodes=coords)
+                # convert to KMT polygon
+                kmt_poly = self._polyToKmtPoly(rot_poly, mod_layer, -px, -py)
                 
                 # create pad
                 kicad_mod.append(kmt.Pad(number = n, type=kmt.Pad.TYPE_SMT, shape = kmt.Pad.SHAPE_CUSTOM, layers = [mod_layer], 
-                                   at=[px + offset_x, -(py + offset_y)], size=[w, h], rotation=rot, primitives=[kipoly], anchor_shape=kmt.Pad.SHAPE_RECT))
+                                   at=[px + offset_x, -(py + offset_y)], size=[w, h], rotation=rot, primitives=[kmt_poly], anchor_shape=kmt.Pad.SHAPE_RECT))
                 
                 # other pads are simple squares
                 for i in range(1, len(pads)):

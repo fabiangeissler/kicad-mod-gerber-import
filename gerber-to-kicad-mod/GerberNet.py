@@ -107,14 +107,18 @@ class GerberNet(object):
             
         pt = geo.Point(x, y)
             
-        for i in range(len(boundary.coords) - 1):
-            line = geo.LineString([boundary.coords[i], boundary.coords[i + 1]])
-            dist = line.distance(pt)
+        if boundary.geom_type != "MultiLineString":
+            boundary = [boundary]
             
-            # find closest line
-            if(dist < mindist):
-                cline = line
-                mindist = dist
+        for bound in boundary:
+            for i in range(len(bound.coords) - 1):
+                line = geo.LineString([bound.coords[i], bound.coords[i + 1]])
+                dist = line.distance(pt)
+                
+                # find closest line
+                if(dist < mindist):
+                    cline = line
+                    mindist = dist
                 
         if cline == None:
             print('WARN: No edges in net poly!')
