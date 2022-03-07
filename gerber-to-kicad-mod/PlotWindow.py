@@ -297,7 +297,7 @@ class PlotWindow(object):
         for layer in self.gerberLayers:
             multipoly = layer.getMultiPolygon()
             
-            for poly in multipoly:
+            for poly in multipoly.geoms:
                 patch = self.plotPoly(poly, layer.getColor())
                 self.polyPatches.append(patch)
         

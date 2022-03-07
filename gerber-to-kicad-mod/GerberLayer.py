@@ -7,6 +7,7 @@ Created on Feb 3, 2021
 import gerber
 import ezdxf
 import os
+from LayoutFile import LayoutFile
 
 import shapely.ops as sop
 import shapely.geometry as geo
@@ -33,33 +34,45 @@ class GerberLayer(object):
         self.id = id
         
         if(filename != None):
-            # Get file extension
-            _, ext = os.path.splitext(filename)
+            lf = LayoutFile()
+            lf.read(filename, filename + ':')
             
-            if(ext == ".dxf"):
-                # DXF file
-                dxfdoc = ezdxf.readfile(filename)
-                unit = dxfdoc.units
-                
-                convf = ezdxf.units.conversion_factor(unit, ezdxf.units.MM)
-                
-                self.nets = []
-                
-                for e in dxfdoc.modelspace():
-                    if e.dxftype() == 'POLYLINE':
-                        points = [[p.x * convf, p.y * convf] for p in e.points()]
-                        poly = geo.Polygon(points)
-                        
-                        self.nets.append(GerberNet(poly))
-                        
-            else: 
-                # Probably Gerber file (can have a lot of extensions)
-                # Parse gerber file
-                gbr = gerber.read(filename)
-                # Convert to metric units
-                gbr.to_metric()
-                # Load primitives from file
-                self._loadFilePrimitives(gbr) 
+            poly = lf.get_layer_poly(lf.get_layer_names()[0])
+
+            if poly.geom_type == 'MultiPolygon':
+                self.nets = [GerberNet(p) for p in poly.geoms]
+            elif poly.geom_type == 'Polygon':
+                self.nets = [GerberNet(poly)]
+            else:
+                print("Only Polygon types allowed!")
+            
+#             # Get file extension
+#             _, ext = os.path.splitext(filename)
+#             
+#             if(ext == ".dxf"):
+#                 # DXF file
+#                 dxfdoc = ezdxf.readfile(filename)
+#                 unit = dxfdoc.units
+#                 
+#                 convf = ezdxf.units.conversion_factor(unit, ezdxf.units.MM)
+#                 
+#                 self.nets = []
+#                 
+#                 for e in dxfdoc.modelspace():
+#                     if e.dxftype() == 'POLYLINE':
+#                         points = [[p.x * convf, p.y * convf] for p in e.points()]
+#                         poly = geo.Polygon(points)
+#                         
+#                         self.nets.append(GerberNet(poly))
+#                         
+#             else: 
+#                 # Probably Gerber file (can have a lot of extensions)
+#                 # Parse gerber file
+#                 gbr = gerber.read(filename)
+#                 # Convert to metric units
+#                 gbr.to_metric()
+#                 # Load primitives from file
+#                 self._loadFilePrimitives(gbr) 
                  
             # Cleanup
             self._cleanupLayer()  
@@ -123,7 +136,7 @@ class GerberLayer(object):
         
         if union.geom_type == 'MultiPolygon':
             # Orient polygons
-            self.nets = [GerberNet(geo.polygon.orient(poly)) for poly in union]
+            self.nets = [GerberNet(geo.polygon.orient(poly)) for poly in union.geoms]
         elif union.geom_type == 'Polygon':
             # Orient polygon
             self.nets = [GerberNet(geo.polygon.orient(union))]
@@ -202,7 +215,7 @@ class GerberLayer(object):
         
         # iterate closed polygons
         for net in self.nets:
-            if len(net.getPads()) == 0:
+            #if len(net.getPads()) == 0:
                 # no pad = poly primitive  
                 # get polygon object
                 poly = net.getPolygon();
@@ -213,36 +226,37 @@ class GerberLayer(object):
                 # save
                 kicad_mod.append(kmt_poly)
                 
-            else:
+            #else:
                 pads = net.getPads()
-                # first pad is anchor
-                anch = pads[0]
-                
-                # center point
-                (pxmin, pymin, pxmax, pymax) = anch.bounds
-                px = (pxmin + pxmax) / 2
-                py = (pymin + pymax) / 2
-                
-                # size and rotation
-                x1, y1 = anch.boundary.coords[0]
-                x2, y2 = anch.boundary.coords[1]
-                x3, y3 = anch.boundary.coords[2]
-                w = sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
-                h = sqrt((x2 - x3) ** 2 + (y2 - y3) ** 2)
-                rot = atan2((y1 - y2), (x1 - x2)) / pi * 180
-                
-                # set pad rotation and transform polygon accordingly
-                rot_poly = aff.rotate(net.getPolygon(), -rot, (px, py))
-                
-                # convert to KMT polygon
-                kmt_poly = self._polyToKmtPoly(rot_poly, mod_layer, -px, -py)
-                
-                # create pad
-                kicad_mod.append(kmt.Pad(number = n, type=kmt.Pad.TYPE_SMT, shape = kmt.Pad.SHAPE_CUSTOM, layers = [mod_layer], 
-                                   at=[px + offset_x, -(py + offset_y)], size=[w, h], rotation=rot, primitives=[kmt_poly], anchor_shape=kmt.Pad.SHAPE_RECT))
-                
+#                 # first pad is anchor
+#                 anch = pads[0]
+#                 
+#                 # center point
+#                 (pxmin, pymin, pxmax, pymax) = anch.bounds
+#                 px = (pxmin + pxmax) / 2
+#                 py = (pymin + pymax) / 2
+#                 
+#                 # size and rotation
+#                 x1, y1 = anch.boundary.coords[0]
+#                 x2, y2 = anch.boundary.coords[1]
+#                 x3, y3 = anch.boundary.coords[2]
+#                 w = sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
+#                 h = sqrt((x2 - x3) ** 2 + (y2 - y3) ** 2)
+#                 rot = atan2((y1 - y2), (x1 - x2)) / pi * 180
+#                 
+#                 # set pad rotation and transform polygon accordingly
+#                 rot_poly = aff.rotate(net.getPolygon(), -rot, (px, py))
+#                 
+#                 # convert to KMT polygon
+#                 kmt_poly = self._polyToKmtPoly(rot_poly, mod_layer, -px, -py)
+#                 
+#                 # create pad
+#                 kicad_mod.append(kmt.Pad(number = n, type=kmt.Pad.TYPE_SMT, shape = kmt.Pad.SHAPE_CUSTOM, layers = [mod_layer], 
+#                                    at=[px + offset_x, -(py + offset_y)], size=[w, h], rotation=rot, primitives=[kmt_poly], anchor_shape=kmt.Pad.SHAPE_RECT))
+#                 
                 # other pads are simple squares
-                for i in range(1, len(pads)):
+                #for i in range(1, len(pads)):
+                for i in range( len(pads)):
                     # center point
                     (pxmin, pymin, pxmax, pymax) = pads[i].bounds
                     px = (pxmin + pxmax) / 2 + offset_x
